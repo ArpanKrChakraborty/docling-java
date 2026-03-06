@@ -59,7 +59,7 @@ import ai.docling.serve.api.convert.request.options.ConvertDocumentOptions;
 import ai.docling.serve.api.convert.request.options.OutputFormat;
 import ai.docling.serve.api.convert.request.source.HttpSource;
 import ai.docling.serve.api.convert.request.target.InBodyTarget;
-import ai.docling.serve.api.convert.response.ConvertDocumentResponse;
+import ai.docling.serve.api.convert.response.InBodyConvertDocumentResponse;
 
 DoclingServeApi api = DoclingServeApi.builder()
     .baseUrl("http://localhost:8000") // your Docling Serve URL
@@ -78,7 +78,7 @@ ConvertDocumentRequest request = ConvertDocumentRequest.builder()
     .target(InBodyTarget.builder().build()) // get results in the HTTP response body
     .build();
 
-ConvertDocumentResponse response = api.convertSource(request);
+InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse)api.convertSource(request);
 System.out.println(response.getDocument().getMarkdownContent());
 ```
 
@@ -132,10 +132,12 @@ Options (`ai.docling.serve.api.convert.request.options.ConvertDocumentOptions`) 
 
 Explore the `options` package for the full list of knobs you can turn.
 
-### Responses: `ConvertDocumentResponse` and `DocumentResponse`
-
-- `ConvertDocumentResponse` contains the converted `document` (if any), `errors`, processing `status`,
-  total `processing_time`, and detailed `timings` map.
+### Responses: `InBodyConvertDocumentResponse`, `PreSignedUrlConvertDocumentResponse`, `ZipArchiveConvertDocumentResponse`  and `DocumentResponse`
+- `InBodyConvertDocumentResponse` contains the converted `document` (if any), `errors`, processing `status`,
+    total `processing_time`, and detailed `timings` map.
+- `PreSignedUrlConvertDocumentResponse` contains processing statistics - total `processing_time` and conversion metrics
+  `num_converted`, `num_succeeded`, `num_failed`.
+- `ZipArchiveConvertDocumentResponse` contains `file_name` and an input stream for the archive.
 - `DocumentResponse` holds the actual content fields you requested, such as `md_content` (Markdown),
   `html_content`, `text_content`, and a `json_content` map. It also includes the `filename` and
   `doctags_content` when relevant.
@@ -154,10 +156,10 @@ System.out.println("Service status: " + health.getStatus());
 ## Error handling
 
 Conversion may succeed partially (e.g., some pages) while returning warnings or errors. Always inspect
-`ConvertDocumentResponse#getErrors()` and consider `status`:
+`InBodyConvertDocumentResponse#getErrors()` and consider `status`:
 
 ```java
-ConvertDocumentResponse response = api.convertSource(request);
+InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse)api.convertSource(request);
 
 if (response.getErrors() != null && !response.getErrors().isEmpty()) {
   response.getErrors().forEach(err ->

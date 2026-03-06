@@ -32,7 +32,7 @@ public interface DoclingServeTaskApi {
   TaskStatusPollResponse pollTaskStatus(TaskStatusPollRequest request);
 
   /**
-   * Converts the result of a completed task into a document format as specified in the request.
+   * Returns the result of a completed convert task.
    *
    * This method processes the task result identified by the unique task ID provided in
    * the request, performs any necessary transformation, and returns a response

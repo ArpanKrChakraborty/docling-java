@@ -1,12 +1,18 @@
 package ai.docling.serve.client.operations;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
 import ai.docling.serve.api.DoclingServeTaskApi;
 import ai.docling.serve.api.chunk.response.ChunkDocumentResponse;
 import ai.docling.serve.api.convert.response.ConvertDocumentResponse;
+import ai.docling.serve.api.convert.response.ZipArchiveConvertDocumentResponse;
 import ai.docling.serve.api.task.request.TaskResultRequest;
 import ai.docling.serve.api.task.request.TaskStatusPollRequest;
 import ai.docling.serve.api.task.response.TaskStatusPollResponse;
 import ai.docling.serve.api.util.ValidationUtils;
+import ai.docling.serve.client.DoclingServeClientException;
+import ai.docling.serve.client.util.Utils;
 
 /**
  * Base class for task API operations. Provides operations for managing and querying
@@ -31,7 +37,7 @@ public final class TaskOperations implements DoclingServeTaskApi {
    *                unique task identifier and optional wait time for polling.
    *                Must not be null.
    * @return a {@link TaskStatusPollResponse} containing the current status of
-   *         the task, its position in the queue, and any associated metadata.
+   *     the task, its position in the queue, and any associated metadata.
    * @throws IllegalArgumentException if the {@code request} is null.
    */
   public TaskStatusPollResponse pollTaskStatus(TaskStatusPollRequest request) {
@@ -46,21 +52,39 @@ public final class TaskOperations implements DoclingServeTaskApi {
   }
 
   /**
-   * Retrieves the result of a completed task identified by the specified task ID.
+   * Retrieves the result of a completed convert task identified by the specified task ID.
    *
    * This method sends a GET request to fetch the result of a task that has been processed.
-   * The response includes details about the converted document, processing time, status,
-   * and any potential errors or additional metadata related to the task.
    *
    * @param request an instance of {@link TaskResultRequest} containing the unique task
    *                identifier. Must not be null.
    * @return a {@link ConvertDocumentResponse} containing details about the converted
-   *         document, processing time, status, and any associated errors or metadata.
+   *     document, processing time, status, and any associated errors or metadata.
    * @throws IllegalArgumentException if {@code request} is null.
    */
   public ConvertDocumentResponse convertTaskResult(TaskResultRequest request) {
     ValidationUtils.ensureNotNull(request, "request");
-    return this.httpOperations.executeGet(createRequestContext("/v1/result/%s".formatted(request.getTaskId()), ConvertDocumentResponse.class));
+    StreamResponse response = this.httpOperations
+        .executeGetWithStreamResponse(createRequestContext("/v1/result/%s".formatted(request.getTaskId()), StreamResponse.class));
+    switch (Utils.getContentType(response.getHeaders()).orElse("Unknown Content-Type")) {
+      case HttpOperations.CONTENT_TYPE_JSON -> {
+        try {
+          return httpOperations
+              .readValue(new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8)
+                  , ConvertDocumentResponse.class);
+        } catch (IOException e) {
+          throw new DoclingServeClientException(e);
+        }
+      }
+      case HttpOperations.CONTENT_TYPE_ZIP -> {
+        String fileName = Utils.getFileName(response.getHeaders()).orElse("converted_docs.zip");
+        return ZipArchiveConvertDocumentResponse
+            .builder().fileName(fileName)
+            .inputStream(response.getBody())
+            .build();
+      }
+      default -> throw new DoclingServeClientException(null, "Content-Type missing in task api response");
+    }
   }
 
   /**
@@ -73,7 +97,7 @@ public final class TaskOperations implements DoclingServeTaskApi {
    * @param request an instance of {@link TaskResultRequest} containing the unique task
    *                identifier. Must not be null.
    * @return a {@link ChunkDocumentResponse} containing details about the chunks,
-   *         documents, processing time, and any associated metadata.
+   *     documents, processing time, and any associated metadata.
    * @throws IllegalArgumentException if {@code request} is null.
    */
   public ChunkDocumentResponse chunkTaskResult(TaskResultRequest request) {

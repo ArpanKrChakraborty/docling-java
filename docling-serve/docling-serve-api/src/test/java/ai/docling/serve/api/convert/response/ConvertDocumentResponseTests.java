@@ -43,7 +43,7 @@ class ConvertDocumentResponseTests {
         "convert_time", 0.7
     );
 
-    ConvertDocumentResponse response = ConvertDocumentResponse.builder()
+    InBodyConvertDocumentResponse response = InBodyConvertDocumentResponse.builder()
         .document(document)
         .errors(errors)
         .processingTime(processingTime)
@@ -59,8 +59,8 @@ class ConvertDocumentResponseTests {
   }
 
   @Test
-  void createResponseWithNullFields() {
-    ConvertDocumentResponse response = ConvertDocumentResponse.builder().build();
+  void createInBodyConvertDocumentResponseWithNullFields() {
+    InBodyConvertDocumentResponse response = InBodyConvertDocumentResponse.builder().build();
 
     assertThat(response.getDocument()).isNull();
     assertThat(response.getErrors()).isNotNull().isEmpty();
@@ -70,13 +70,31 @@ class ConvertDocumentResponseTests {
   }
 
   @Test
+  void createZipArchiveConvertDocumentResponseWithNullFields() {
+    ZipArchiveConvertDocumentResponse response = ZipArchiveConvertDocumentResponse.builder().build();
+
+    assertThat(response.getInputStream()).isNull();
+    assertThat(response.getFileName()).isNotNull().isEqualTo("converted_docs.zip");
+  }
+
+  @Test
+  void createPreSignedUrlConvertDocumentResponseWithNullFields() {
+    PreSignedUrlConvertDocumentResponse response = PreSignedUrlConvertDocumentResponse.builder().build();
+
+    assertThat(response.getNumConverted()).isNull();
+    assertThat(response.getNumFailed()).isNull();
+    assertThat(response.getProcessingTime()).isNull();
+    assertThat(response.getNumSucceeded()).isNull();
+  }
+
+  @Test
   void createResponseWithEmptyCollections() {
     DocumentResponse document = DocumentResponse.builder()
         .filename("empty-file.txt")
         .textContent("")
         .build();
 
-    ConvertDocumentResponse response = ConvertDocumentResponse.builder()
+    InBodyConvertDocumentResponse response = InBodyConvertDocumentResponse.builder()
         .document(document)
         .processingTime(0.1)
         .status("completed")
@@ -97,7 +115,7 @@ class ConvertDocumentResponseTests {
 
     Map<String, Object> timings = new HashMap<>(Map.of("original_time", 1.0));
 
-    ConvertDocumentResponse response = ConvertDocumentResponse.builder()
+    InBodyConvertDocumentResponse response = InBodyConvertDocumentResponse.builder()
         .errors(errors)
         .timings(timings)
         .build();

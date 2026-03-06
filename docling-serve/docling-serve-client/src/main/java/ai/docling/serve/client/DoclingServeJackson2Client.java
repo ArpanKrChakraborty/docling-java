@@ -76,7 +76,6 @@ public class DoclingServeJackson2Client extends DoclingServeClient {
     private JsonMapper.Builder jsonMapperBuilder = JsonMapper.builder()
         // This is the default in Jackson 3 whereas it needs to be set explicitly in Jackson 2.
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
     private Builder() {
     }
 

@@ -3,6 +3,7 @@ package ai.docling.serve.client;
 import static ai.docling.serve.api.util.ValidationUtils.ensureNotNull;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpClient.Redirect;
@@ -12,6 +13,7 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +54,7 @@ import ai.docling.serve.client.operations.ConvertOperations;
 import ai.docling.serve.client.operations.HealthOperations;
 import ai.docling.serve.client.operations.HttpOperations;
 import ai.docling.serve.client.operations.RequestContext;
+import ai.docling.serve.client.operations.StreamResponse;
 import ai.docling.serve.client.operations.TaskOperations;
 
 /**
@@ -214,7 +217,12 @@ public abstract class DoclingServeClient extends HttpOperations implements Docli
     long startTime = System.currentTimeMillis();
 
     try {
-      var response = this.httpClient.send(request, BodyHandlers.ofString());
+      HttpResponse<?> response = null;
+      if(StreamResponse.class.equals(expectedValueType))
+        response = this.httpClient.send(request, BodyHandlers.ofInputStream());
+      else
+        response = this.httpClient.send(request, BodyHandlers.ofString());
+
       return getResponse(request, response, expectedValueType);
     }
     catch (IOException | InterruptedException e) {
@@ -237,11 +245,30 @@ public abstract class DoclingServeClient extends HttpOperations implements Docli
   }
 
   @Override
+  protected <I> StreamResponse executePostWithStreamResponse(RequestContext<I, StreamResponse> requestContext) {
+    var httpRequest = createRequestBuilder(requestContext)
+        .header("Accept", "application/octet-stream")
+        .header("Content-Type", "application/json")
+        .POST(new LoggingBodyPublisher<>(requestContext.getRequest()))
+        .build();
+    return execute(httpRequest, requestContext.getResponseType());
+  }
+
+  @Override
   protected <I, O> O executeGet(RequestContext<I, O> requestContext) {
     var httpRequest = createRequestBuilder(requestContext)
         .GET()
         .build();
 
+    return execute(httpRequest, requestContext.getResponseType());
+  }
+
+  @Override
+  protected <I> StreamResponse executeGetWithStreamResponse(RequestContext<I, StreamResponse> requestContext) {
+    var httpRequest = createRequestBuilder(requestContext)
+        .header("Accept", "application/octet-stream")
+        .GET()
+        .build();
     return execute(httpRequest, requestContext.getResponseType());
   }
 
@@ -265,28 +292,51 @@ public abstract class DoclingServeClient extends HttpOperations implements Docli
         .orElse(path);
   }
 
-  protected <T> T getResponse(HttpRequest request, HttpResponse<String> response, Class<T> expectedReturnType) {
+  protected <T> T getResponse(HttpRequest request, HttpResponse<?> response, Class<T> expectedReturnType) {
     var body = response.body();
 
-    if (this.logResponses) {
-      logResponse(response, Optional.ofNullable(body));
+    // if expectedReturnType is StreamResponse.class, avoid logging potential binary data
+    if (this.logResponses && !(StreamResponse.class.equals(expectedReturnType))) {
+      logResponse((HttpResponse<String>) response, Optional.ofNullable(body.toString()));
     }
 
     var statusCode = response.statusCode();
 
     if (statusCode == 422) {
+      if(StreamResponse.class.equals(expectedReturnType)) {
+        try {
+          body = new String(((InputStream)body).readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+          throw new DoclingServeClientException(e);
+        }
+      }
       throw new ValidationException(
-          readValue(body, ValidationError.class),
+          readValue(body.toString(), ValidationError.class),
           "An error occurred while making %s request to %s".formatted(request.method(), request.uri())
       );
     }
     else if (statusCode >= 400) {
       // Handle errors
       // The Java HTTPClient doesn't throw exceptions on error codes
-      throw new DoclingServeClientException("An error occurred: %s".formatted(body), statusCode, body);
+      if(StreamResponse.class.equals(expectedReturnType)) {
+        try {
+          body = new String(((InputStream)body).readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+          throw new DoclingServeClientException(e);
+        }
+      }
+      throw new DoclingServeClientException("An error occurred: %s".formatted(body.toString()), statusCode, body.toString());
     }
 
-    return readValue(body, expectedReturnType);
+    if(StreamResponse.class.equals(expectedReturnType)) {
+      return (T) StreamResponse
+          .builder()
+          .headers(headerName -> response.headers().firstValue(headerName))
+          .body((InputStream)body)
+          .build();
+    } else {
+      return readValue(body.toString(), expectedReturnType);
+    }
   }
 
   @Override
@@ -500,7 +550,7 @@ public abstract class DoclingServeClient extends HttpOperations implements Docli
      * Sets the polling interval for async operations.
      *
      * <p>This configures how frequently the client will check the status of async
-     * conversion tasks when using {@link DoclingServeApi#convertSourceAsync(ConvertDocumentRequest)} (ConvertDocumentRequest)}.
+     * conversion tasks when using {@link DoclingServeApi#convertSourceAsync(ConvertDocumentRequest)} (ConvertDocumentRequest).
      *
      * @param asyncPollInterval the polling interval (must not be null or negative)
      * @return this builder instance for method chaining
@@ -515,7 +565,7 @@ public abstract class DoclingServeClient extends HttpOperations implements Docli
      * Sets the timeout for async operations.
      *
      * <p>This configures the maximum time to wait for an async conversion task to complete
-     * when using {@link DoclingServeApi#convertSourceAsync(ConvertDocumentRequest)} (ConvertDocumentRequest)}.
+     * when using {@link DoclingServeApi#convertSourceAsync(ConvertDocumentRequest)} (ConvertDocumentRequest).
      *
      * @param asyncTimeout the timeout duration (must not be null or negative)
      * @return this builder instance for method chaining

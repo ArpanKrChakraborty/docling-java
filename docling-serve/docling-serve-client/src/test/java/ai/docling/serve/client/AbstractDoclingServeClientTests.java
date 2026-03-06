@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -33,8 +34,12 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.Flow.Subscriber;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.jspecify.annotations.Nullable;
@@ -63,17 +68,25 @@ import ai.docling.serve.api.clear.request.ClearResultsRequest;
 import ai.docling.serve.api.clear.response.ClearResponse;
 import ai.docling.serve.api.convert.request.ConvertDocumentRequest;
 import ai.docling.serve.api.convert.request.options.ConvertDocumentOptions;
+import ai.docling.serve.api.convert.request.options.ImageRefMode;
 import ai.docling.serve.api.convert.request.options.OutputFormat;
 import ai.docling.serve.api.convert.request.options.TableFormerMode;
 import ai.docling.serve.api.convert.request.source.HttpSource;
 import ai.docling.serve.api.convert.request.source.S3Source;
+import ai.docling.serve.api.convert.request.target.PutTarget;
 import ai.docling.serve.api.convert.request.target.S3Target;
+import ai.docling.serve.api.convert.request.target.ZipTarget;
 import ai.docling.serve.api.convert.response.ConvertDocumentResponse;
+import ai.docling.serve.api.convert.response.InBodyConvertDocumentResponse;
+import ai.docling.serve.api.convert.response.PreSignedUrlConvertDocumentResponse;
+import ai.docling.serve.api.convert.response.ResponseType;
+import ai.docling.serve.api.convert.response.ZipArchiveConvertDocumentResponse;
 import ai.docling.serve.api.health.HealthCheckResponse;
 import ai.docling.serve.api.task.request.TaskResultRequest;
 import ai.docling.serve.api.task.request.TaskStatusPollRequest;
 import ai.docling.serve.api.task.response.TaskStatus;
 import ai.docling.serve.api.task.response.TaskStatusPollResponse;
+import ai.docling.serve.api.util.FileUtils;
 import ai.docling.serve.api.validation.ValidationError;
 import ai.docling.serve.api.validation.ValidationErrorContext;
 import ai.docling.serve.api.validation.ValidationErrorDetail;
@@ -269,7 +282,7 @@ abstract class AbstractDoclingServeClientTests {
           .build();
 
       var result = getDoclingClient().convertTaskResult(request);
-      ConvertTests.assertConvertHttpSource(result);
+      ConvertTests.assertConvertSingleHttpSourceWithDefaultTarget(result);
     }
 
     @Test
@@ -439,17 +452,34 @@ abstract class AbstractDoclingServeClientTests {
 
   @Nested
   class ConvertTests {
-    static void assertConvertHttpSource(ConvertDocumentResponse response) {
+    static void assertConvertSingleHttpSourceWithDefaultTarget(ConvertDocumentResponse response) {
       assertThat(response).isNotNull();
-      assertThat(response.getStatus()).isNotEmpty();
-      assertThat(response.getDocument()).isNotNull();
-      assertThat(response.getDocument().getFilename()).isNotEmpty();
+      assertThat(response.getResponseType().equals(ResponseType.InBodyConvertDocumentResponse)).isTrue();
+      var inBodyResponse = (InBodyConvertDocumentResponse)response;
+      assertThat(inBodyResponse.getStatus()).isNotEmpty();
+      assertThat(inBodyResponse.getDocument()).isNotNull();
+      assertThat(inBodyResponse.getDocument().getFilename()).isNotEmpty();
 
-      if (response.getProcessingTime() != null) {
-        assertThat(response.getProcessingTime()).isPositive();
+      if (inBodyResponse.getProcessingTime() != null) {
+        assertThat(inBodyResponse.getProcessingTime()).isPositive();
       }
 
-      assertThat(response.getDocument().getMarkdownContent()).isNotEmpty();
+      assertThat(inBodyResponse.getDocument().getMarkdownContent()).isNotEmpty();
+    }
+
+    static void assertZipArchiveEntries(InputStream inputStream, Set<String> expectedEntries) {
+      Set<String> actualEntries = new TreeSet<>();
+      try (ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
+        ZipEntry entry;
+        while ((entry = zipInputStream.getNextEntry()) != null) {
+          actualEntries.add(entry.getName());
+          LOG.info("Found entry in ZIP: {} (size: {} bytes)", entry.getName(), entry.getSize());
+          zipInputStream.closeEntry();
+        }
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      assertThat(actualEntries).containsExactlyInAnyOrderElementsOf(expectedEntries);
     }
 
     @Test
@@ -498,6 +528,59 @@ abstract class AbstractDoclingServeClientTests {
     }
 
     @Test
+    void shouldConvertSourceWithPutTargetSuccessfully() {
+      var request = ConvertDocumentRequest.builder()
+          .source(
+              HttpSource
+                  .builder()
+                  .url(URI.create("https://docs.arconia.io/arconia-cli/latest/development/dev/"))
+                  .build()
+          )
+          .target(
+              PutTarget.builder().url(URI.create("https://github.com/docling-project/docling-java/save")).build()
+          ).build();
+
+      var wireMockServer = getWiremockServer();
+
+      wireMockServer.stubFor(
+          post("/v1/convert/source")
+              .withRequestBody(equalToJson(writeValueAsString(request)))
+              .withHeader("Content-Type", equalTo("application/json"))
+              .withHeader("Accept", equalTo("application/json"))
+              .willReturn(okJson("""
+                 {
+                   "processing_time": 7,
+                   "num_converted": 10,
+                   "num_succeeded": 5,
+                   "num_failed": 5
+                 }
+              """))
+      );
+
+      var response = getDoclingClient(false, true).convertSource(request);
+      assertThat(response).isNotNull();
+      assertThat(response.getResponseType().equals(ResponseType.PreSignedUrlConvertDocumentResponse)).isTrue();
+      var preSignedUrlResponse = (PreSignedUrlConvertDocumentResponse)response;
+
+      assertThat(preSignedUrlResponse.getNumConverted()).isEqualTo(10);
+      assertThat(preSignedUrlResponse.getNumSucceeded()).isEqualTo(5);
+      assertThat(preSignedUrlResponse.getNumFailed()).isEqualTo(5);
+      assertThat(preSignedUrlResponse.getProcessingTime()).isPositive().isEqualTo(7);
+
+      wireMockServer.verify(
+          1,
+          postRequestedFor(urlPathEqualTo("/v1/convert/source"))
+              .withHeader("Content-Type", equalTo("application/json"))
+              .withRequestBody(
+                  matchingJsonPath("$.sources[0].kind", equalTo("http"))
+                      .and(matchingJsonPath("$.sources[0].url", equalTo("https://docs.arconia.io/arconia-cli/latest/development/dev/")))
+                      .and(matchingJsonPath("$.target.kind", equalTo("put")))
+                      .and(matchingJsonPath("$.target.url", equalTo("https://github.com/docling-project/docling-java/save")))
+              )
+      );
+    }
+
+    @Test
     void shouldConvertS3SourceSuccessfully() {
       // Need to use Wiremock here rather than a "real" backend because Docling Serve requires kubeflow
       // See https://github.com/docling-project/docling-serve/issues/462
@@ -528,7 +611,14 @@ abstract class AbstractDoclingServeClientTests {
               .withRequestBody(equalToJson(writeValueAsString(request)))
               .withHeader("Content-Type", equalTo("application/json"))
               .withHeader("Accept", equalTo("application/json"))
-              .willReturn(okJson("{}"))
+              .willReturn(okJson("""
+                 {
+                   "processing_time": 7,
+                   "num_converted": 10,
+                   "num_succeeded": 5,
+                   "num_failed": 5
+                 }
+              """))
       );
 
       var response = getDoclingClient(false, true).convertSource(request);
@@ -556,29 +646,32 @@ abstract class AbstractDoclingServeClientTests {
     }
 
     @Test
-    void shouldConvertHttpSourceSuccessfully() {
+    void shouldConvertSingleHttpSourceWithDefaultTargetSuccessfully() {
       var request = ConvertDocumentRequest.builder()
           .source(HttpSource.builder().url(URI.create("https://docs.arconia.io/arconia-cli/latest/development/dev/")).build())
           .build();
 
       var response = getDoclingClient().convertSource(request);
-      assertConvertHttpSource(response);
+      assertConvertSingleHttpSourceWithDefaultTarget(response);
     }
 
     @Test
     void shouldConvertFileSuccessfully() {
       var response = getDoclingClient().convertFiles(Path.of("src", "test", "resources", "story.pdf"));
-
+      assertThat(ResponseType.InBodyConvertDocumentResponse.equals(response.getResponseType())).isTrue();
       assertThat(response).isNotNull();
-      assertThat(response.getStatus()).isNotEmpty();
-      assertThat(response.getDocument()).isNotNull();
-      assertThat(response.getDocument().getFilename()).isEqualTo("story.pdf");
 
-      if (response.getProcessingTime()!=null) {
-        assertThat(response.getProcessingTime()).isPositive();
+      var inBodyResponse = (InBodyConvertDocumentResponse)response;
+
+      assertThat(inBodyResponse.getStatus()).isNotEmpty();
+      assertThat(inBodyResponse.getDocument()).isNotNull();
+      assertThat(inBodyResponse.getDocument().getFilename()).isEqualTo("story.pdf");
+
+      if (inBodyResponse.getProcessingTime()!=null) {
+        assertThat(inBodyResponse.getProcessingTime()).isPositive();
       }
 
-      assertThat(response.getDocument().getMarkdownContent()).isNotEmpty();
+      assertThat(inBodyResponse.getDocument().getMarkdownContent()).isNotEmpty();
     }
 
     @Test
@@ -597,9 +690,13 @@ abstract class AbstractDoclingServeClientTests {
 
       var response = getDoclingClient().convertSource(request);
 
+      assertThat(ResponseType.InBodyConvertDocumentResponse.equals(response.getResponseType())).isTrue();
       assertThat(response).isNotNull();
-      assertThat(response.getStatus()).isNotEmpty();
-      assertThat(response.getDocument()).isNotNull();
+
+      var inBodyResponse = (InBodyConvertDocumentResponse)response;
+
+      assertThat(inBodyResponse.getStatus()).isNotEmpty();
+      assertThat(inBodyResponse.getDocument()).isNotNull();
     }
 
     @Test
@@ -615,11 +712,15 @@ abstract class AbstractDoclingServeClientTests {
 
       ConvertDocumentResponse response = getDoclingClient().convertSource(request);
 
+      assertThat(ResponseType.InBodyConvertDocumentResponse.equals(response.getResponseType())).isTrue();
       assertThat(response).isNotNull();
-      assertThat(response.getStatus()).isNotEmpty();
-      assertThat(response.getDocument()).isNotNull();
 
-      DoclingDocument doclingDocument = response.getDocument().getJsonContent();
+      var inBodyResponse = (InBodyConvertDocumentResponse)response;
+
+      assertThat(inBodyResponse.getStatus()).isNotEmpty();
+      assertThat(inBodyResponse.getDocument()).isNotNull();
+
+      DoclingDocument doclingDocument = inBodyResponse.getDocument().getJsonContent();
       assertThat(doclingDocument).isNotNull();
       assertThat(doclingDocument.getName()).isNotEmpty();
       assertThat(doclingDocument.getTexts().get(0).getLabel()).isEqualTo(DocItemLabel.TITLE);
@@ -633,21 +734,30 @@ abstract class AbstractDoclingServeClientTests {
 
       ConvertDocumentResponse response = getDoclingClient().convertSourceAsync(request).toCompletableFuture().join();
 
+      assertThat(ResponseType.InBodyConvertDocumentResponse.equals(response.getResponseType())).isTrue();
+      assertThat(response).isInstanceOf(InBodyConvertDocumentResponse.class);
       assertThat(response).isNotNull();
-      assertThat(response.getStatus()).isNotEmpty();
-      assertThat(response.getDocument()).isNotNull();
-      assertThat(response.getDocument().getMarkdownContent()).isNotEmpty();
+
+      var inBodyResponse = (InBodyConvertDocumentResponse)response;
+
+      assertThat(inBodyResponse.getStatus()).isNotEmpty();
+      assertThat(inBodyResponse.getDocument()).isNotNull();
+      assertThat(inBodyResponse.getDocument().getMarkdownContent()).isNotEmpty();
     }
 
     @Test
     void shouldConvertFileAsync() {
       ConvertDocumentResponse response = getDoclingClient().convertFilesAsync(Path.of("src", "test", "resources", "story.pdf")).toCompletableFuture().join();
 
+      assertThat(ResponseType.InBodyConvertDocumentResponse.equals(response.getResponseType())).isTrue();
       assertThat(response).isNotNull();
-      assertThat(response.getStatus()).isNotEmpty();
-      assertThat(response.getDocument()).isNotNull();
-      assertThat(response.getDocument().getFilename()).isEqualTo("story.pdf");
-      assertThat(response.getDocument().getMarkdownContent()).isNotEmpty();
+
+      var inBodyResponse = (InBodyConvertDocumentResponse)response;
+
+      assertThat(inBodyResponse.getStatus()).isNotEmpty();
+      assertThat(inBodyResponse.getDocument()).isNotNull();
+      assertThat(inBodyResponse.getDocument().getFilename()).isEqualTo("story.pdf");
+      assertThat(inBodyResponse.getDocument().getMarkdownContent()).isNotEmpty();
     }
 
     @Test
@@ -666,9 +776,15 @@ abstract class AbstractDoclingServeClientTests {
 
       ConvertDocumentResponse response = getDoclingClient().convertSourceAsync(request).toCompletableFuture().join();
 
+      assertThat(ResponseType.InBodyConvertDocumentResponse.equals(response.getResponseType())).isTrue();
       assertThat(response).isNotNull();
-      assertThat(response.getStatus()).isNotEmpty();
-      assertThat(response.getDocument()).isNotNull();
+
+      var inBodyResponse = (InBodyConvertDocumentResponse)response;
+
+
+      assertThat(inBodyResponse).isNotNull();
+      assertThat(inBodyResponse.getStatus()).isNotEmpty();
+      assertThat(inBodyResponse.getDocument()).isNotNull();
     }
 
     @Test
@@ -679,10 +795,168 @@ abstract class AbstractDoclingServeClientTests {
 
       // Test chaining with thenApply
       String markdownContent = getDoclingClient().convertSourceAsync(request)
-          .thenApply(response -> response.getDocument().getMarkdownContent())
+          .thenApply(response -> ((InBodyConvertDocumentResponse)response).getDocument().getMarkdownContent())
           .toCompletableFuture().join();
 
       assertThat(markdownContent).isNotEmpty();
+    }
+
+    @Test
+    void shouldConvertSingleFileSourceWithZipTargetAsync() {
+      Path[] files = new Path[]{Path.of("src", "test", "resources", "2408.09869.pdf")};
+
+      var requestBuilder = ConvertDocumentRequest
+          .builder()
+          .target(ZipTarget.builder().build());
+
+      FileUtils.createFileSources(files)
+          .forEach(requestBuilder::source);
+
+      var request = requestBuilder.build();
+
+      var response = getDoclingClient()
+          .convertSourceAsync(request).toCompletableFuture().join();
+
+      assertThat(response).isNotNull();
+      assertThat(response.getResponseType().equals(ResponseType.ZipArchiveConvertDocumentResponse)).isTrue();
+      assertThat(response).isInstanceOf(ZipArchiveConvertDocumentResponse.class);
+      assertThat(((ZipArchiveConvertDocumentResponse)response).getFileName()).isEqualTo("converted_docs.zip");
+      assertThat(((ZipArchiveConvertDocumentResponse)response).getInputStream()).isNotNull();
+      assertZipArchiveEntries(((ZipArchiveConvertDocumentResponse)response).getInputStream(), Set.of("2408.09869.md"));
+    }
+
+    @Test
+    void shouldConvertSingleFileSourceWithZipTargetAndReferencedImageExportModeAsync() {
+      Path[] files = new Path[]{Path.of("src", "test", "resources", "2408.09869.pdf")};
+
+      var requestBuilder = ConvertDocumentRequest
+          .builder()
+          .target(ZipTarget.builder().build())
+          .options(ConvertDocumentOptions.builder().imageExportMode(ImageRefMode.REFERENCED).build());
+
+      FileUtils.createFileSources(files)
+          .forEach(requestBuilder::source);
+
+      var request = requestBuilder.build();
+
+      var response = getDoclingClient()
+          .convertSourceAsync(request).toCompletableFuture().join();
+
+      assertThat(response).isNotNull();
+      assertThat(response.getResponseType().equals(ResponseType.ZipArchiveConvertDocumentResponse)).isTrue();
+      assertThat(response).isInstanceOf(ZipArchiveConvertDocumentResponse.class);
+      assertThat(((ZipArchiveConvertDocumentResponse)response).getFileName()).isEqualTo("converted_docs.zip");
+      assertThat(((ZipArchiveConvertDocumentResponse)response).getInputStream()).isNotNull();
+      assertZipArchiveEntries(((ZipArchiveConvertDocumentResponse)response).getInputStream(),
+          Set.of("2408.09869.md",
+              "artifacts/",
+              "artifacts/image_000000_4f05ea6de89ce20493a5d9cc2305a4feb948c7bb794d7b81ee29554ec56b8445.png"));
+    }
+
+    @Test
+    void shouldConvertMultipleFileSourcesAsync(){
+      Path[] files = new Path[]{Path.of("src", "test", "resources", "2408.09869.pdf"),
+          Path.of("src", "test", "resources", "story.pdf")};
+
+      var requestBuilder = ConvertDocumentRequest
+          .builder();
+
+      FileUtils.createFileSources(files)
+          .forEach(requestBuilder::source);
+
+      var request = requestBuilder.build();
+
+      var response = getDoclingClient()
+          .convertSourceAsync(request).toCompletableFuture().join();
+
+      assertThat(response).isNotNull();
+      assertThat(response.getResponseType().equals(ResponseType.ZipArchiveConvertDocumentResponse)).isTrue();
+      assertThat(response).isInstanceOf(ZipArchiveConvertDocumentResponse.class);
+      assertThat(((ZipArchiveConvertDocumentResponse)response).getFileName()).isEqualTo("converted_docs.zip");
+      assertThat(((ZipArchiveConvertDocumentResponse)response).getInputStream()).isNotNull();
+      assertZipArchiveEntries(((ZipArchiveConvertDocumentResponse)response).getInputStream(),
+          Set.of("2408.09869.md", "story.md"));
+    }
+
+    @Test
+    void shouldConvertMultipleFileSourcesWithReferencedImageExportModeAsync(){
+      Path[] files = new Path[]{Path.of("src", "test", "resources", "2408.09869.pdf"),
+          Path.of("src", "test", "resources", "story.pdf")};
+
+      var requestBuilder = ConvertDocumentRequest
+          .builder()
+          .options(ConvertDocumentOptions.builder().imageExportMode(ImageRefMode.REFERENCED).build());
+
+      FileUtils.createFileSources(files)
+          .forEach(requestBuilder::source);
+
+      var request = requestBuilder.build();
+
+      var response = getDoclingClient()
+          .convertSourceAsync(request).toCompletableFuture().join();
+
+      assertThat(response).isNotNull();
+      assertThat(response.getResponseType().equals(ResponseType.ZipArchiveConvertDocumentResponse)).isTrue();
+      assertThat(response).isInstanceOf(ZipArchiveConvertDocumentResponse.class);
+      assertThat(((ZipArchiveConvertDocumentResponse)response).getFileName()).isEqualTo("converted_docs.zip");
+      assertThat(((ZipArchiveConvertDocumentResponse)response).getInputStream()).isNotNull();
+      assertZipArchiveEntries(((ZipArchiveConvertDocumentResponse)response).getInputStream(),
+          Set.of("2408.09869.md", "story.md", "artifacts/",
+              "artifacts/image_000000_4f05ea6de89ce20493a5d9cc2305a4feb948c7bb794d7b81ee29554ec56b8445.png"));
+    }
+
+    @Test
+    void shouldConvertMultipleFileSourcesWithInBodyTargetAsync() {
+      Path[] files = new Path[]{Path.of("src", "test", "resources", "2408.09869.pdf"),
+          Path.of("src", "test", "resources", "story.pdf")};
+
+      var requestBuilder = ConvertDocumentRequest
+          .builder()
+          .target(ZipTarget.builder().build());
+
+      FileUtils.createFileSources(files)
+          .forEach(requestBuilder::source);
+
+      var request = requestBuilder.build();
+
+      var response = getDoclingClient()
+          .convertSourceAsync(request).toCompletableFuture().join();
+
+      assertThat(response).isNotNull();
+      assertThat(response.getResponseType().equals(ResponseType.ZipArchiveConvertDocumentResponse)).isTrue();
+      assertThat(response).isInstanceOf(ZipArchiveConvertDocumentResponse.class);
+      assertThat(((ZipArchiveConvertDocumentResponse)response).getFileName()).isEqualTo("converted_docs.zip");
+      assertThat(((ZipArchiveConvertDocumentResponse)response).getInputStream()).isNotNull();
+      assertZipArchiveEntries(((ZipArchiveConvertDocumentResponse)response).getInputStream(),
+          Set.of("2408.09869.md", "story.md"));
+    }
+
+    @Test
+    void shouldConvertMultipleFileSourcesWithInBodyTargetAndReferencedImageExportModeAsync() {
+      Path[] files = new Path[]{Path.of("src", "test", "resources", "2408.09869.pdf"),
+          Path.of("src", "test", "resources", "story.pdf")};
+
+      var requestBuilder = ConvertDocumentRequest
+          .builder()
+          .target(ZipTarget.builder().build())
+          .options(ConvertDocumentOptions.builder().imageExportMode(ImageRefMode.REFERENCED).build());
+
+      FileUtils.createFileSources(files)
+          .forEach(requestBuilder::source);
+
+      var request = requestBuilder.build();
+
+      var response = getDoclingClient()
+          .convertSourceAsync(request).toCompletableFuture().join();
+
+      assertThat(response).isNotNull();
+      assertThat(response.getResponseType().equals(ResponseType.ZipArchiveConvertDocumentResponse)).isTrue();
+      assertThat(response).isInstanceOf(ZipArchiveConvertDocumentResponse.class);
+      assertThat(((ZipArchiveConvertDocumentResponse)response).getFileName()).isEqualTo("converted_docs.zip");
+      assertThat(((ZipArchiveConvertDocumentResponse)response).getInputStream()).isNotNull();
+      assertZipArchiveEntries(((ZipArchiveConvertDocumentResponse)response).getInputStream(),
+          Set.of("2408.09869.md", "story.md", "artifacts/",
+              "artifacts/image_000000_4f05ea6de89ce20493a5d9cc2305a4feb948c7bb794d7b81ee29554ec56b8445.png"));
     }
 
     @Test

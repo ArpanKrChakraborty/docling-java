@@ -6,9 +6,14 @@ import java.util.concurrent.CompletionStage;
 import ai.docling.serve.api.DoclingServeConvertApi;
 import ai.docling.serve.api.DoclingServeTaskApi;
 import ai.docling.serve.api.convert.request.ConvertDocumentRequest;
+import ai.docling.serve.api.convert.request.target.PutTarget;
+import ai.docling.serve.api.convert.request.target.S3Target;
+import ai.docling.serve.api.convert.request.target.ZipTarget;
 import ai.docling.serve.api.convert.response.ConvertDocumentResponse;
+import ai.docling.serve.api.convert.response.ZipArchiveConvertDocumentResponse;
 import ai.docling.serve.api.task.request.TaskResultRequest;
 import ai.docling.serve.api.util.ValidationUtils;
+import ai.docling.serve.client.util.Utils;
 
 /**
  * Base class for document conversion API operations. Provides access to document
@@ -21,10 +26,10 @@ public final class ConvertOperations extends AsyncOperations implements DoclingS
   /**
    * Creates a new ConvertOperations instance.
    *
-   * @param httpOperations the HTTP operations handler for executing requests
-   * @param taskApi the task operations handler for polling and retrieving results
+   * @param httpOperations    the HTTP operations handler for executing requests
+   * @param taskApi           the task operations handler for polling and retrieving results
    * @param asyncPollInterval the interval between status polls for async operations
-   * @param asyncTimeout the maximum time to wait for async operations to complete
+   * @param asyncTimeout      the maximum time to wait for async operations to complete
    */
   public ConvertOperations(HttpOperations httpOperations, DoclingServeTaskApi taskApi,
                            Duration asyncPollInterval, Duration asyncTimeout) {
@@ -41,13 +46,31 @@ public final class ConvertOperations extends AsyncOperations implements DoclingS
   @Override
   public ConvertDocumentResponse convertSource(ConvertDocumentRequest request) {
     ValidationUtils.ensureNotNull(request, "request");
-    return this.httpOperations.executePost(createRequestContext("/v1/convert/source", request));
+    final String uri = "/v1/convert/source";
+
+    boolean hasMultipleSources = request.getSources().size() > 1;
+    boolean isRemoteTarget = request.getTarget() instanceof S3Target || request.getTarget() instanceof PutTarget;
+    boolean isZipTarget = request.getTarget() instanceof ZipTarget;
+
+    if((hasMultipleSources && !isRemoteTarget) || isZipTarget) {
+      StreamResponse response = this.httpOperations
+          .executePostWithStreamResponse(createRequestContext(uri, request,
+              StreamResponse.class));
+      String fileName = Utils.getFileName(response.getHeaders()).orElse("converted_docs.zip");
+      return ZipArchiveConvertDocumentResponse
+          .builder().fileName(fileName)
+          .inputStream(response.getBody())
+          .build();
+    } else {
+      return this.httpOperations.executePost(createRequestContext(uri, request,
+          ConvertDocumentResponse.class));
+    }
   }
 
-  private <I> RequestContext<I, ConvertDocumentResponse> createRequestContext(String uri, I request) {
-    return RequestContext.<I, ConvertDocumentResponse>builder()
+  private <I, O> RequestContext<I, O> createRequestContext(String uri, I request, Class<O> responseType) {
+    return RequestContext.<I, O>builder()
         .request(request)
-        .responseType(ConvertDocumentResponse.class)
+        .responseType(responseType)
         .uri(uri)
         .build();
   }

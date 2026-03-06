@@ -95,7 +95,7 @@ import ai.docling.serve.api.convert.request.options.ConvertDocumentOptions;
 import ai.docling.serve.api.convert.request.options.OutputFormat;
 import ai.docling.serve.api.convert.request.source.HttpSource;
 import ai.docling.serve.api.convert.request.target.InBodyTarget;
-import ai.docling.serve.api.convert.response.ConvertDocumentResponse;
+import ai.docling.serve.api.convert.response.InBodyConvertDocumentResponse;
 
 String baseUrl = docling.getApiUrl();
 DoclingServeApi api = DoclingServeApi.builder()
@@ -111,7 +111,7 @@ ConvertDocumentRequest request = ConvertDocumentRequest.builder()
     .target(InBodyTarget.builder().build())
     .build();
 
-ConvertDocumentResponse response = api.convertSource(request);
+InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse)api.convertSource(request);
 // Assert on response.getDocument().getMarkdownContent(), errors, timings, etc.
 ```
 

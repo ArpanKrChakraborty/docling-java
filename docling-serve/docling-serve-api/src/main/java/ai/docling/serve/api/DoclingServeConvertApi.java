@@ -21,7 +21,7 @@ public interface DoclingServeConvertApi {
    * Converts the provided document source(s) into a processed document based on the specified options.
    *
    * @param request the {@link ConvertDocumentRequest} containing the source(s), conversion options, and optional target.
-   * @return a {@link ConvertDocumentResponse} containing the processed document data, processing details, and any errors.
+   * @return a {@link ConvertDocumentResponse} describing the convert document response.
    * @throws ai.docling.serve.api.validation.ValidationException If request validation fails for any reason.
    */
   ConvertDocumentResponse convertSource(ConvertDocumentRequest request);
