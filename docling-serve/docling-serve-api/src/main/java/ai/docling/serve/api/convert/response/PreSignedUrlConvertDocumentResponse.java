@@ -11,17 +11,17 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * specified location.
  * The response includes processing statistics and conversion metrics.</p>
  *
- * <p>Use cases:</p>
+ * <p>This response type is returned in any one the following scenarios:</p>
  * <ul>
- *   <li>Target type is {@link ai.docling.serve.api.convert.request.target.S3Target}</li>
  *   <li>Target type is {@link ai.docling.serve.api.convert.request.target.PutTarget}</li>
+ *   <li>Target type is {@link ai.docling.serve.api.convert.request.target.S3Target}</li>
  * </ul>
  *
  * <p>Serialization uses {@link JsonInclude.Include#NON_EMPTY}, so nulls and empty
  * collections/strings are omitted from JSON output.</p>
  *
  * @see ConvertDocumentResponse
- * @see ResponseType#PreSignedUrlConvertDocumentResponse
+ * @see ResponseType#PRE_SIGNED_URL
  * @see ai.docling.serve.api.convert.request.target.S3Target
  * @see ai.docling.serve.api.convert.request.target.PutTarget
  */
@@ -45,7 +45,7 @@ public final class PreSignedUrlConvertDocumentResponse extends ConvertDocumentRe
   /**
    * Number of attempted conversions
    *
-   * @param numSucceeded the number of attempted conversions
+   * @param num_converted the number of attempted conversions
    * @return the number of attempted conversions
    */
   @JsonProperty("num_converted")
@@ -63,7 +63,7 @@ public final class PreSignedUrlConvertDocumentResponse extends ConvertDocumentRe
   /**
    * Number of failed conversions
    *
-   * @param numSucceeded the number of failed conversions
+   * @param numFailed the number of failed conversions
    * @return the number of failed conversions
    */
   @JsonProperty("num_failed")
@@ -72,7 +72,7 @@ public final class PreSignedUrlConvertDocumentResponse extends ConvertDocumentRe
   @Override
   @lombok.ToString.Include
   public ResponseType getResponseType() {
-    return ResponseType.PreSignedUrlConvertDocumentResponse;
+    return ResponseType.PRE_SIGNED_URL;
   }
 
   /**
@@ -81,10 +81,10 @@ public final class PreSignedUrlConvertDocumentResponse extends ConvertDocumentRe
    *
    * <p>Builder methods:
    * <ul>
-   *   <li>{@code processingTime(Double)} - Set the processing time in seconds</li>
-   *   <li>{@code numConverted(Integer)} - Set the number of successful conversions</li>
-   *   <li>{@code numFailed(Integer)} - Set the number of failed conversions</li>
+   *   <li>{@code processingTime(Double)} - Set the total processing time in seconds</li>
    *   <li>{@code numConverted(Integer)} - Set the number of attempted conversions</li>
+   *   <li>{@code numSucceeded(Integer)} - Set the number of successful conversions</li>
+   *   <li>{@code numFailed(Integer)} - Set the number of failed conversions</li>
    * </ul>
    */
   @tools.jackson.databind.annotation.JsonPOJOBuilder(withPrefix = "")

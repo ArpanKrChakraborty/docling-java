@@ -1,10 +1,32 @@
 # What's New in Docling Java
 
-Docling Java {{ gradle.project_version }} provides a number of new features, enhancements, and bug fixes. This page includes the highlights of the release, but you can also check out the full [release notes](https://github.com/docling-project/docling-java/releases) for more details about each new feature and bug fix.
+Docling Java {{ gradle.project_version }} includes important breaking changes, along with new features, enhancements, and bug fixes. This page includes the highlights of the release, but you can also check out the full [release notes](https://github.com/docling-project/docling-java/releases) for more details about each change.
 
 ## Docling Serve
 
 ### {{ gradle.project_version }}
+
+#### Breaking Changes
+
+* **`ConvertDocumentResponse` is now an abstract class** with three concrete implementations:
+    * `InBodyConvertDocumentResponse` - Response content embedded directly in the response body
+    * `ZipArchiveConvertDocumentResponse` - Response content packaged and returned as a ZIP archive
+    * `PreSignedUrlConvertDocumentResponse` - Response content packaged as a ZIP archive and uploaded to an S3 bucket or a pre-signed URL and statistical data is returned.
+* A discriminator method `getResponseType()` is provided to determine the response type, returning one of:
+    * `ResponseType.IN_BODY`
+    * `ResponseType.ZIP_ARCHIVE`
+    * `ResponseType.PRE_SIGNED_URL`
+* **Response type determination logic:**
+    * `InBodyConvertDocumentResponse` (`ResponseType.IN_BODY`) - Returned when:
+        * Target is `InBodyTarget` (default) AND only a single source is provided
+    * `ZipArchiveConvertDocumentResponse` (`ResponseType.ZIP_ARCHIVE`) - Returned when:
+        * Target is `ZipTarget` OR
+        * Multiple sources are provided with default or `InBodyTarget`
+    * `PreSignedUrlConvertDocumentResponse` (`ResponseType.PRE_SIGNED_URL`) - Returned when:
+        * Target is `S3Target` or `PutTarget`
+* **Migration guide:** Use `getResponseType()` to determine the concrete type and cast accordingly, or use pattern matching (Java 16+) or instanceof checks to handle different response types.
+
+### 0.4.8
 
 * Add S3-based source and target support with enhanced extensibility.
 * Introduce API extension point and enhance builder usage.

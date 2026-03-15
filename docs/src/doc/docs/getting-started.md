@@ -20,7 +20,7 @@ ConvertDocumentRequest request = ConvertDocumentRequest.builder()
     )
     .build();
 
-InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse)doclingServeApi.convertSource(request);
+InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse) doclingServeApi.convertSource(request);
 System.out.println(response.getDocument().getMarkdownContent());
 ```
 

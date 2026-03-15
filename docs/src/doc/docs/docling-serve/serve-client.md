@@ -77,7 +77,7 @@ ConvertDocumentRequest request = ConvertDocumentRequest.builder()
     .target(InBodyTarget.builder().build())
     .build();
 
-InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse)api.convertSource(request);
+InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse) api.convertSource(request);
 System.out.println(response.getDocument().getMarkdownContent());
 ```
 
@@ -194,12 +194,13 @@ All request/response types come from [`docling-serve-api`](serve-api.md). Common
 ## Error handling tips
 
 Transport errors (DNS, TLS, connection reset, timeouts) are thrown as standard Java exceptions
-from `HttpClient`. Conversion may also return structured errors in the response body — inspect
-`ConvertDocumentResponse#getErrors()` even when content is present:
+from `HttpClient`. Conversion may also return structured errors in the response body — when using
+an `InBodyTarget`, you can inspect errors on the `InBodyConvertDocumentResponse` even when content
+is present:
 
 ```java
 // InBodyConvertDocumentResponse
-var result = api.convertSource(request);
+var result = (InBodyConvertDocumentResponse) api.convertSource(request);
 if (result.getErrors() != null && !result.getErrors().isEmpty()) {
   result.getErrors().forEach(err ->
       System.err.println("Component=" + err.getComponentType()

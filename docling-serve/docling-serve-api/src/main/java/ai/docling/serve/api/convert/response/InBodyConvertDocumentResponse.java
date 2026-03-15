@@ -11,9 +11,9 @@ import com.fasterxml.jackson.annotation.Nulls;
 /**
  * Response for single document conversions with in-body content delivery.
  *
- * <p>This response type is returned when:</p>
+ * <p>This response type is returned when both the following conditions hold:</p>
  * <ul>
- *   <li>The conversion request contains a single source file</li>
+ *   <li>The conversion request contains a single source</li>
  *   <li>The target type is {@link ai.docling.serve.api.convert.request.target.InBodyTarget}</li>
  * </ul>
  *
@@ -25,7 +25,7 @@ import com.fasterxml.jackson.annotation.Nulls;
  * collections/strings are omitted from JSON output.</p>
  *
  * @see ConvertDocumentResponse
- * @see ResponseType#InBodyConvertDocumentResponse
+ * @see ResponseType#IN_BODY
  * @see ai.docling.serve.api.convert.request.target.InBodyTarget
  * @see DocumentResponse
  */
@@ -88,7 +88,7 @@ public final class InBodyConvertDocumentResponse extends ConvertDocumentResponse
   @Override
   @lombok.ToString.Include
   public ResponseType getResponseType() {
-    return ResponseType.InBodyConvertDocumentResponse;
+    return ResponseType.IN_BODY;
   }
 
   /**

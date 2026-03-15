@@ -11,7 +11,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *
  * <p>This response type is returned in any one the following scenarios:</p>
  * <ul>
- *   <li>The conversion request contains multiple source files</li>
+ *   <li>The conversion request contains multiple source files with {@link ai.docling.serve.api.convert.request.target.InBodyTarget}/li>
  *   <li>The target type is {@link ai.docling.serve.api.convert.request.target.ZipTarget}</li>
  * </ul>
  *
@@ -23,7 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * collections/strings are omitted from JSON output.</p>
  *
  * @see ConvertDocumentResponse
- * @see ResponseType#ZipArchiveConvertDocumentResponse
+ * @see ResponseType#ZIP_ARCHIVE
  * @see ai.docling.serve.api.convert.request.target.ZipTarget
  * @see ai.docling.serve.api.convert.request.ConvertDocumentRequest
  */
@@ -68,7 +68,7 @@ public final class ZipArchiveConvertDocumentResponse extends ConvertDocumentResp
   @Override
   @lombok.ToString.Include
   public ResponseType getResponseType() {
-    return ResponseType.ZipArchiveConvertDocumentResponse;
+    return ResponseType.ZIP_ARCHIVE;
   }
 
   /**

@@ -2,6 +2,7 @@ package ai.docling.client.tester.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.atIndex;
+import static org.assertj.core.api.Assertions.fail;
 
 import java.net.URI;
 import java.time.Duration;
@@ -25,7 +26,6 @@ import ai.docling.serve.api.convert.request.source.HttpSource;
 import ai.docling.serve.api.convert.response.ConvertDocumentResponse;
 import ai.docling.serve.api.convert.response.DocumentResponse;
 import ai.docling.serve.api.convert.response.InBodyConvertDocumentResponse;
-import ai.docling.serve.api.convert.response.PreSignedUrlConvertDocumentResponse;
 import ai.docling.serve.api.health.HealthCheckResponse;
 import ai.docling.testcontainers.serve.DoclingServeContainer;
 import ai.docling.testcontainers.serve.config.DoclingServeContainerConfig;
@@ -112,7 +112,7 @@ public class TagsTester {
 
   private void checkDoclingResponse(ConvertDocumentResponse response) {
     switch(response.getResponseType()) {
-      case InBodyConvertDocumentResponse -> {
+      case IN_BODY -> {
         var inBodyResponse = (InBodyConvertDocumentResponse)response;
         Log.debugf("Response: %s", inBodyResponse);
 
@@ -166,11 +166,7 @@ public class TagsTester {
                 atIndex(3)
             );
       }
-      case PreSignedUrlConvertDocumentResponse -> {
-        var preSignedUrlResponse = (PreSignedUrlConvertDocumentResponse)response;
-        Log.debugf("Response: %s", preSignedUrlResponse);
-      }
-      case ZipArchiveConvertDocumentResponse -> {}
+      case PRE_SIGNED_URL, ZIP_ARCHIVE -> fail("Expected InBodyConvertDocumentResponse but got %s", response.getResponseType());
     }
   }
 

@@ -12,7 +12,6 @@ import ai.docling.serve.api.task.request.TaskStatusPollRequest;
 import ai.docling.serve.api.task.response.TaskStatusPollResponse;
 import ai.docling.serve.api.util.ValidationUtils;
 import ai.docling.serve.client.DoclingServeClientException;
-import ai.docling.serve.client.util.Utils;
 
 /**
  * Base class for task API operations. Provides operations for managing and querying
@@ -66,24 +65,24 @@ public final class TaskOperations implements DoclingServeTaskApi {
     ValidationUtils.ensureNotNull(request, "request");
     StreamResponse response = this.httpOperations
         .executeGetWithStreamResponse(createRequestContext("/v1/result/%s".formatted(request.getTaskId()), StreamResponse.class));
-    switch (Utils.getContentType(response.getHeaders()).orElse("Unknown Content-Type")) {
+    switch (response.getHeaders().getContentType().orElse("Unknown Content-Type")) {
       case HttpOperations.CONTENT_TYPE_JSON -> {
-        try {
+        try (var is = response.getBody()) {
           return httpOperations
-              .readValue(new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8)
+              .readValue(new String(is.readAllBytes(), StandardCharsets.UTF_8)
                   , ConvertDocumentResponse.class);
         } catch (IOException e) {
           throw new DoclingServeClientException(e);
         }
       }
       case HttpOperations.CONTENT_TYPE_ZIP -> {
-        String fileName = Utils.getFileName(response.getHeaders()).orElse("converted_docs.zip");
+        String fileName = response.getHeaders().getFileName().orElse("converted_docs.zip");
         return ZipArchiveConvertDocumentResponse
             .builder().fileName(fileName)
             .inputStream(response.getBody())
             .build();
       }
-      default -> throw new DoclingServeClientException(null, "Content-Type missing in task api response");
+      default -> throw new DoclingServeClientException(null, "Invalid Content-Type in Task API response");
     }
   }
 

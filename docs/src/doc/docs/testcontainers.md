@@ -111,7 +111,7 @@ ConvertDocumentRequest request = ConvertDocumentRequest.builder()
     .target(InBodyTarget.builder().build())
     .build();
 
-InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse)api.convertSource(request);
+InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse) api.convertSource(request);
 // Assert on response.getDocument().getMarkdownContent(), errors, timings, etc.
 ```
 

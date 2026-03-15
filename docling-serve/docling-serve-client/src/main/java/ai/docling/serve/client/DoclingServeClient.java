@@ -304,8 +304,10 @@ public abstract class DoclingServeClient extends HttpOperations implements Docli
 
     if (statusCode == 422) {
       if(StreamResponse.class.equals(expectedReturnType)) {
-        try {
-          body = new String(((InputStream)body).readAllBytes(), StandardCharsets.UTF_8);
+        // typical 4XX responses are usually accompanied by JSON response bodies
+        // hence, reading the stream here.
+        try (InputStream is = (InputStream) body){
+          body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
           throw new DoclingServeClientException(e);
         }
@@ -319,8 +321,10 @@ public abstract class DoclingServeClient extends HttpOperations implements Docli
       // Handle errors
       // The Java HTTPClient doesn't throw exceptions on error codes
       if(StreamResponse.class.equals(expectedReturnType)) {
-        try {
-          body = new String(((InputStream)body).readAllBytes(), StandardCharsets.UTF_8);
+        // typical 4XX responses are usually accompanied by JSON response bodies
+        // hence, reading the stream here.
+        try (InputStream is = (InputStream) body){
+          body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
           throw new DoclingServeClientException(e);
         }

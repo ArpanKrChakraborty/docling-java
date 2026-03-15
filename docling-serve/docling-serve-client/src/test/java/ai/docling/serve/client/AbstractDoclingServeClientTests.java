@@ -454,7 +454,7 @@ abstract class AbstractDoclingServeClientTests {
   class ConvertTests {
     static void assertConvertSingleHttpSourceWithDefaultTarget(ConvertDocumentResponse response) {
       assertThat(response).isNotNull();
-      assertThat(response.getResponseType().equals(ResponseType.InBodyConvertDocumentResponse)).isTrue();
+      assertThat(response.getResponseType().equals(ResponseType.IN_BODY)).isTrue();
       var inBodyResponse = (InBodyConvertDocumentResponse)response;
       assertThat(inBodyResponse.getStatus()).isNotEmpty();
       assertThat(inBodyResponse.getDocument()).isNotNull();
@@ -559,7 +559,7 @@ abstract class AbstractDoclingServeClientTests {
 
       var response = getDoclingClient(false, true).convertSource(request);
       assertThat(response).isNotNull();
-      assertThat(response.getResponseType().equals(ResponseType.PreSignedUrlConvertDocumentResponse)).isTrue();
+      assertThat(response.getResponseType().equals(ResponseType.PRE_SIGNED_URL)).isTrue();
       var preSignedUrlResponse = (PreSignedUrlConvertDocumentResponse)response;
 
       assertThat(preSignedUrlResponse.getNumConverted()).isEqualTo(10);
@@ -658,7 +658,7 @@ abstract class AbstractDoclingServeClientTests {
     @Test
     void shouldConvertFileSuccessfully() {
       var response = getDoclingClient().convertFiles(Path.of("src", "test", "resources", "story.pdf"));
-      assertThat(ResponseType.InBodyConvertDocumentResponse.equals(response.getResponseType())).isTrue();
+      assertThat(ResponseType.IN_BODY.equals(response.getResponseType())).isTrue();
       assertThat(response).isNotNull();
 
       var inBodyResponse = (InBodyConvertDocumentResponse)response;
@@ -690,7 +690,7 @@ abstract class AbstractDoclingServeClientTests {
 
       var response = getDoclingClient().convertSource(request);
 
-      assertThat(ResponseType.InBodyConvertDocumentResponse.equals(response.getResponseType())).isTrue();
+      assertThat(ResponseType.IN_BODY.equals(response.getResponseType())).isTrue();
       assertThat(response).isNotNull();
 
       var inBodyResponse = (InBodyConvertDocumentResponse)response;
@@ -712,7 +712,7 @@ abstract class AbstractDoclingServeClientTests {
 
       ConvertDocumentResponse response = getDoclingClient().convertSource(request);
 
-      assertThat(ResponseType.InBodyConvertDocumentResponse.equals(response.getResponseType())).isTrue();
+      assertThat(ResponseType.IN_BODY.equals(response.getResponseType())).isTrue();
       assertThat(response).isNotNull();
 
       var inBodyResponse = (InBodyConvertDocumentResponse)response;
@@ -734,7 +734,7 @@ abstract class AbstractDoclingServeClientTests {
 
       ConvertDocumentResponse response = getDoclingClient().convertSourceAsync(request).toCompletableFuture().join();
 
-      assertThat(ResponseType.InBodyConvertDocumentResponse.equals(response.getResponseType())).isTrue();
+      assertThat(ResponseType.IN_BODY.equals(response.getResponseType())).isTrue();
       assertThat(response).isInstanceOf(InBodyConvertDocumentResponse.class);
       assertThat(response).isNotNull();
 
@@ -749,7 +749,7 @@ abstract class AbstractDoclingServeClientTests {
     void shouldConvertFileAsync() {
       ConvertDocumentResponse response = getDoclingClient().convertFilesAsync(Path.of("src", "test", "resources", "story.pdf")).toCompletableFuture().join();
 
-      assertThat(ResponseType.InBodyConvertDocumentResponse.equals(response.getResponseType())).isTrue();
+      assertThat(ResponseType.IN_BODY.equals(response.getResponseType())).isTrue();
       assertThat(response).isNotNull();
 
       var inBodyResponse = (InBodyConvertDocumentResponse)response;
@@ -776,7 +776,7 @@ abstract class AbstractDoclingServeClientTests {
 
       ConvertDocumentResponse response = getDoclingClient().convertSourceAsync(request).toCompletableFuture().join();
 
-      assertThat(ResponseType.InBodyConvertDocumentResponse.equals(response.getResponseType())).isTrue();
+      assertThat(ResponseType.IN_BODY.equals(response.getResponseType())).isTrue();
       assertThat(response).isNotNull();
 
       var inBodyResponse = (InBodyConvertDocumentResponse)response;
@@ -818,7 +818,7 @@ abstract class AbstractDoclingServeClientTests {
           .convertSourceAsync(request).toCompletableFuture().join();
 
       assertThat(response).isNotNull();
-      assertThat(response.getResponseType().equals(ResponseType.ZipArchiveConvertDocumentResponse)).isTrue();
+      assertThat(response.getResponseType().equals(ResponseType.ZIP_ARCHIVE)).isTrue();
       assertThat(response).isInstanceOf(ZipArchiveConvertDocumentResponse.class);
       assertThat(((ZipArchiveConvertDocumentResponse)response).getFileName()).isEqualTo("converted_docs.zip");
       assertThat(((ZipArchiveConvertDocumentResponse)response).getInputStream()).isNotNull();
@@ -843,7 +843,7 @@ abstract class AbstractDoclingServeClientTests {
           .convertSourceAsync(request).toCompletableFuture().join();
 
       assertThat(response).isNotNull();
-      assertThat(response.getResponseType().equals(ResponseType.ZipArchiveConvertDocumentResponse)).isTrue();
+      assertThat(response.getResponseType().equals(ResponseType.ZIP_ARCHIVE)).isTrue();
       assertThat(response).isInstanceOf(ZipArchiveConvertDocumentResponse.class);
       assertThat(((ZipArchiveConvertDocumentResponse)response).getFileName()).isEqualTo("converted_docs.zip");
       assertThat(((ZipArchiveConvertDocumentResponse)response).getInputStream()).isNotNull();
@@ -870,7 +870,7 @@ abstract class AbstractDoclingServeClientTests {
           .convertSourceAsync(request).toCompletableFuture().join();
 
       assertThat(response).isNotNull();
-      assertThat(response.getResponseType().equals(ResponseType.ZipArchiveConvertDocumentResponse)).isTrue();
+      assertThat(response.getResponseType().equals(ResponseType.ZIP_ARCHIVE)).isTrue();
       assertThat(response).isInstanceOf(ZipArchiveConvertDocumentResponse.class);
       assertThat(((ZipArchiveConvertDocumentResponse)response).getFileName()).isEqualTo("converted_docs.zip");
       assertThat(((ZipArchiveConvertDocumentResponse)response).getInputStream()).isNotNull();
@@ -896,7 +896,7 @@ abstract class AbstractDoclingServeClientTests {
           .convertSourceAsync(request).toCompletableFuture().join();
 
       assertThat(response).isNotNull();
-      assertThat(response.getResponseType().equals(ResponseType.ZipArchiveConvertDocumentResponse)).isTrue();
+      assertThat(response.getResponseType().equals(ResponseType.ZIP_ARCHIVE)).isTrue();
       assertThat(response).isInstanceOf(ZipArchiveConvertDocumentResponse.class);
       assertThat(((ZipArchiveConvertDocumentResponse)response).getFileName()).isEqualTo("converted_docs.zip");
       assertThat(((ZipArchiveConvertDocumentResponse)response).getInputStream()).isNotNull();
@@ -923,7 +923,7 @@ abstract class AbstractDoclingServeClientTests {
           .convertSourceAsync(request).toCompletableFuture().join();
 
       assertThat(response).isNotNull();
-      assertThat(response.getResponseType().equals(ResponseType.ZipArchiveConvertDocumentResponse)).isTrue();
+      assertThat(response.getResponseType().equals(ResponseType.ZIP_ARCHIVE)).isTrue();
       assertThat(response).isInstanceOf(ZipArchiveConvertDocumentResponse.class);
       assertThat(((ZipArchiveConvertDocumentResponse)response).getFileName()).isEqualTo("converted_docs.zip");
       assertThat(((ZipArchiveConvertDocumentResponse)response).getInputStream()).isNotNull();
@@ -950,7 +950,7 @@ abstract class AbstractDoclingServeClientTests {
           .convertSourceAsync(request).toCompletableFuture().join();
 
       assertThat(response).isNotNull();
-      assertThat(response.getResponseType().equals(ResponseType.ZipArchiveConvertDocumentResponse)).isTrue();
+      assertThat(response.getResponseType().equals(ResponseType.ZIP_ARCHIVE)).isTrue();
       assertThat(response).isInstanceOf(ZipArchiveConvertDocumentResponse.class);
       assertThat(((ZipArchiveConvertDocumentResponse)response).getFileName()).isEqualTo("converted_docs.zip");
       assertThat(((ZipArchiveConvertDocumentResponse)response).getInputStream()).isNotNull();

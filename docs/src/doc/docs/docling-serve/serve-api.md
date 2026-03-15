@@ -78,7 +78,7 @@ ConvertDocumentRequest request = ConvertDocumentRequest.builder()
     .target(InBodyTarget.builder().build()) // get results in the HTTP response body
     .build();
 
-InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse)api.convertSource(request);
+InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse) api.convertSource(request);
 System.out.println(response.getDocument().getMarkdownContent());
 ```
 
@@ -159,7 +159,7 @@ Conversion may succeed partially (e.g., some pages) while returning warnings or 
 `InBodyConvertDocumentResponse#getErrors()` and consider `status`:
 
 ```java
-InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse)api.convertSource(request);
+InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse) api.convertSource(request);
 
 if (response.getErrors() != null && !response.getErrors().isEmpty()) {
   response.getErrors().forEach(err ->

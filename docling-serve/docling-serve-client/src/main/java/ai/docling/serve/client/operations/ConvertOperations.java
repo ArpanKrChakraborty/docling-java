@@ -12,8 +12,8 @@ import ai.docling.serve.api.convert.request.target.ZipTarget;
 import ai.docling.serve.api.convert.response.ConvertDocumentResponse;
 import ai.docling.serve.api.convert.response.ZipArchiveConvertDocumentResponse;
 import ai.docling.serve.api.task.request.TaskResultRequest;
+import ai.docling.serve.api.util.Utils;
 import ai.docling.serve.api.util.ValidationUtils;
-import ai.docling.serve.client.util.Utils;
 
 /**
  * Base class for document conversion API operations. Provides access to document
@@ -46,9 +46,10 @@ public final class ConvertOperations extends AsyncOperations implements DoclingS
   @Override
   public ConvertDocumentResponse convertSource(ConvertDocumentRequest request) {
     ValidationUtils.ensureNotNull(request, "request");
-    final String uri = "/v1/convert/source";
+    final var uri = "/v1/convert/source";
 
-    boolean hasMultipleSources = request.getSources().size() > 1;
+    boolean hasMultipleSources = !Utils.isNullOrEmpty(request.getSources()) ?
+                                 request.getSources().size() > 1: Boolean.FALSE;
     boolean isRemoteTarget = request.getTarget() instanceof S3Target || request.getTarget() instanceof PutTarget;
     boolean isZipTarget = request.getTarget() instanceof ZipTarget;
 
@@ -56,7 +57,7 @@ public final class ConvertOperations extends AsyncOperations implements DoclingS
       StreamResponse response = this.httpOperations
           .executePostWithStreamResponse(createRequestContext(uri, request,
               StreamResponse.class));
-      String fileName = Utils.getFileName(response.getHeaders()).orElse("converted_docs.zip");
+      String fileName = response.getHeaders().getFileName().orElse("converted_docs.zip");
       return ZipArchiveConvertDocumentResponse
           .builder().fileName(fileName)
           .inputStream(response.getBody())
