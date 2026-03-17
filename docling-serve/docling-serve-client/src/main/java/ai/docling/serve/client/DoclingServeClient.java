@@ -218,11 +218,11 @@ public abstract class DoclingServeClient extends HttpOperations implements Docli
 
     try {
       HttpResponse<?> response = null;
-      if(StreamResponse.class.equals(expectedValueType))
+      if(StreamResponse.class.equals(expectedValueType)) {
         response = this.httpClient.send(request, BodyHandlers.ofInputStream());
-      else
+      } else {
         response = this.httpClient.send(request, BodyHandlers.ofString());
-
+      }
       return getResponse(request, response, expectedValueType);
     }
     catch (IOException | InterruptedException e) {
@@ -302,9 +302,9 @@ public abstract class DoclingServeClient extends HttpOperations implements Docli
 
     var statusCode = response.statusCode();
 
-    if (statusCode == 422) {
+    if(statusCode >= 400) {
       if(StreamResponse.class.equals(expectedReturnType)) {
-        // typical 4XX responses are usually accompanied by JSON response bodies
+        // typical 4XX  & 5XX responses are usually accompanied by JSON response bodies
         // hence, reading the stream here.
         try (InputStream is = (InputStream) body){
           body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
@@ -312,24 +312,15 @@ public abstract class DoclingServeClient extends HttpOperations implements Docli
           throw new DoclingServeClientException(e);
         }
       }
-      throw new ValidationException(
+
+      if(statusCode == 422) {
+        throw new ValidationException(
           readValue(body.toString(), ValidationError.class),
           "An error occurred while making %s request to %s".formatted(request.method(), request.uri())
-      );
-    }
-    else if (statusCode >= 400) {
-      // Handle errors
-      // The Java HTTPClient doesn't throw exceptions on error codes
-      if(StreamResponse.class.equals(expectedReturnType)) {
-        // typical 4XX responses are usually accompanied by JSON response bodies
-        // hence, reading the stream here.
-        try (InputStream is = (InputStream) body){
-          body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-          throw new DoclingServeClientException(e);
-        }
+        );
+      } else {
+        throw new DoclingServeClientException("An error occurred: %s".formatted(body.toString()), statusCode, body.toString());
       }
-      throw new DoclingServeClientException("An error occurred: %s".formatted(body.toString()), statusCode, body.toString());
     }
 
     if(StreamResponse.class.equals(expectedReturnType)) {

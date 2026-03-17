@@ -24,6 +24,22 @@ InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse) docling
 System.out.println(response.getDocument().getMarkdownContent());
 ```
 
+If you're unsure of the concrete type returned by the convert API, you can handle it dynamically using the `getResponseType()` method:
+
+```java
+import ai.docling.serve.api.convert.response.ResponseType;
+
+// ... your code to create and configure the request ...
+
+var result = doclingServeApi.convertSource(request);
+
+switch(result.getResponseType()) {
+    case ResponseType.IN_BODY -> // Response is InBodyConvertDocumentResponse
+    case ResponseType.ZIP_ARCHIVE -> // Response is ZipArchiveConvertDocumentResponse
+    case ResponseType.PRE_SIGNED_URL -> // Response is PreSignedUrlConvertDocumentResponse
+}
+```
+
 For more examples and options, explore the modules listed above and the repository README.
 
 ## Links
