@@ -53,7 +53,7 @@ For example:
 import ai.docling.serve.api.DoclingServeApi;
 import ai.docling.serve.api.convert.request.ConvertDocumentRequest;
 import ai.docling.serve.api.convert.request.source.HttpSource;
-import ai.docling.serve.api.convert.response.ConvertDocumentResponse;
+import ai.docling.serve.api.convert.response.InBodyConvertDocumentResponse;
 
 DoclingServeApi doclingServeApi = DoclingServeApi.builder()
     .baseUrl("<location of docling serve instance>")
@@ -67,10 +67,25 @@ ConvertDocumentRequest request = ConvertDocumentRequest.builder()
     )
     .build();
 
-ConvertDocumentResponse response = doclingServeApi.convertSource(request);
+InBodyConvertDocumentResponse response = (InBodyConvertDocumentResponse) doclingServeApi.convertSource(request);
 System.out.println(response.getDocument().getMarkdownContent());
 ```
 
+If you're unsure of the concrete type returned by the convert API, you can handle it dynamically using the `getResponseType()` method:
+
+```java
+import ai.docling.serve.api.convert.response.ResponseType;
+
+// ... your code to create and configure the request ...
+
+var result = doclingServeApi.convertSource(request);
+
+switch(result.getResponseType()) {
+    case ResponseType.IN_BODY -> // Response is InBodyConvertDocumentResponse
+    case ResponseType.ZIP_ARCHIVE -> // Response is ZipArchiveConvertDocumentResponse
+    case ResponseType.PRE_SIGNED_URL -> // Response is PreSignedUrlConvertDocumentResponse
+}
+```
 More [usage information](https://docling-project.github.io/docling-java) is available in the docs.
 
 ## Get help and support
